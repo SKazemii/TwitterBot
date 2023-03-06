@@ -8,15 +8,17 @@ app = Flask(__name__)
 api = Api(app)
 
 
-
+@app.route("/")
+def index():
+    return "Hello from ViralML!!!"
 
 # accounts endpoint
-class accounts(Resource):
-    def get(self):
-        dataframe = utils.load_data()
-        users = dataframe['user'].unique().tolist()
-        return {'accounts': users}
-api.add_resource(accounts, '/accounts')
+@app.route("/accounts")
+def accounts():
+    dataframe = utils.load_data()
+    users = dataframe['user'].unique().tolist()
+    return {'accounts': users}
+
 
 
 # tweets endpoint

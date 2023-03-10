@@ -1,11 +1,12 @@
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 import tweepy
-import config, json, os
+import config as config
 import pandas as pd
-import logging
+import logging, json, os
 
 from pathlib import Path as Pathlb
+import snscrape.modules.twitter as sntwitter
 
 
 def create_logger(level):
@@ -85,11 +86,35 @@ def get_tweets_dataframe(tweets_dict):
 def report(Data_frame):
     pass
 
-def save_data(Data_frame):
+def save_data(Data_frame, filename):
     '''Saves a pandas DataFrame to a parquet file.'''
-    Data_frame.to_parquet(config.data_path + '/tweets.parquet', index=False)
+    Data_frame.to_parquet(config.data_path + f'/{filename}.parquet', index=False)
 
-def load_data():
+def load_data(filename):
     '''Returns a pandas DataFrame from a parquet file.'''
-    Data_frame = pd.read_parquet(config.data_path + '/tweets.parquet')
-    return Data_frame
+    return pd.read_parquet(config.data_path + f'/{filename}.parquet')
+
+
+def search_tweets(tweet_amount:int, query_tweetId:str):
+    '''Returns a list of tweets from a query.'''
+    tweet_list = []
+    for tweet1 in sntwitter.TwitterTweetScraper(tweetId=query_tweetId).get_items():
+        conversationId = tweet1.conversationId
+        formatted_date =  tweet1.date.strftime("%Y-%m-%d")
+
+        query = f'from:{tweet1.user.username} since:{formatted_date} lang:en'
+        for tweet in sntwitter.TwitterSearchScraper(query).get_items():
+            tweet_list.append([tweet.date, tweet.id, tweet.conversationId, tweet.inReplyToTweetId, tweet.user.username, tweet.rawContent])
+            if len (tweet_list) >= tweet_amount:
+                break
+
+        query = f'(to:{tweet1.user.username}) since:{formatted_date} lang:en'
+        for tweet in sntwitter.TwitterSearchScraper(query).get_items():
+            tweet_list.append([tweet.date, tweet.id, tweet.conversationId, tweet.inReplyToTweetId, tweet.user.username, tweet.rawContent])
+            if len (tweet_list) >= 5*tweet_amount:
+                break
+    
+    Data_frame = pd.DataFrame(tweet_list, columns = ['time', 'id', 'conversationId', 'inReplyToTweetId','username', 'content'])
+    Data_frame = Data_frame[Data_frame.conversationId == conversationId].sort_values(by=['time'])
+    Data_frame['pos'], Data_frame['neg'], Data_frame['neu'] = zip(*Data_frame['content'].apply(sentimentanalyzer))
+    return Data_frame, tweet1.user.username
